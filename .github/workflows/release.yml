@@ -1,0 +1,88 @@
+name: Release
+
+# Publishes a new npm version whenever a version tag (v*) is pushed.
+# Usage:
+#   1. Bump version + tag on main:
+#        npm version patch|minor|major
+#        git push --follow-tags
+#      The workflow builds, tests the bundle, publishes to npm,
+#      and creates a GitHub Release with the tarball attached.
+#   2. Or run manually from the Actions tab (input: version bump type).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type (ignored when triggered by a tag)'
+        required: false
+        default: 'patch'
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build
+        run: node build.js
+
+      # Manual dispatch: bump the version here so package.json + tag are consistent.
+      - name: Bump version (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version "${{ github.event.inputs.version_bump || 'patch' }}" --no-git-tag-version
+          NEW_VER=$(node -p "require('./package.json').version")
+          git commit -am "chore(release): v$NEW_VER" || true
+          git tag "v$NEW_VER"
+
+      # Tag-triggered runs: package.json version is already tagged; keep in sync.
+      - name: Sync package.json version with tag (tag runs)
+        if: github.event_name == 'push'
+        run: |
+          TAG_VER="${GITHUB_REF_NAME#v}"
+          CUR_VER=$(node -p "require('./package.json').version")
+          if [ "$TAG_VER" != "$CUR_VER" ]; then
+            npm version "$TAG_VER" --no-git-tag-version --allow-same-version
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore(release): v$TAG_VER [skip ci]" || true
+          fi
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
