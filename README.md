@@ -30,13 +30,15 @@ const { box, confidence } = await rec.detect(bitmap); // box=[x1,y1,x2,y2] 原�
 ### Userscript（Tampermonkey 等）
 
 ```js
-// @require https://cdn.jsdelivr.net/npm/captcha-recognizer-js@1/dist/captcha-recognizer-js.umd.js
+// @require https://cdn.jsdelivr.net/npm/captcha-recognizer-js@1.0.3/dist/captcha-recognizer-js.umd.js
 // @connect cdn.jsdelivr.net
 // @connect unpkg.com
 ...
 const rec = await CaptchaRecognizerJs.createRecognizer();
 const { box, confidence } = await rec.detect(bitmap);
 ```
+
+> **版本锁定建议**：jsdelivr 对 `@1` 这类 semver 范围路径有边缘缓存，新版本发布后可能延迟刷新。userscript 建议锁定精确版本号（如 `@1.0.3`），或发布后到 [purge.jsdelivr.net](https://purge.jsdelivr.net) 手动刷新。
 
 ### `<script>` 标签
 
@@ -56,11 +58,21 @@ const { box, confidence } = await rec.detect(bitmap);
 
 - `modelUrl?: string` — 自定义 ONNX 模型地址（默认从 jsdelivr 读取）
 
-### `recognizer.detect(source)` → `Promise<{box, confidence}>`
+### `recognizer.detect(source, opts?)` → `Promise<{box, confidence, naturalWidth, naturalHeight}>`
 
 - `source`: `ImageBitmap` | `HTMLCanvasElement` | `OffscreenCanvas` | `Blob` | `{data,width,height}`（RGBA `Uint8ClampedArray`）
-- `box`: `[x1, y1, x2, y2]` 原图像素坐标（缺口左上 / 右下）
+- `opts.displayWidth` / `opts.displayHeight`（可选）— 展示区域宽高。验证码图片在页面上被缩放渲染时（如 CSS 缩放），传入实际渲染尺寸，返回的 `box` 将映射为**展示区域坐标系**；不传则默认为图片原始尺寸（不换算）
+- `box`: `[x1, y1, x2, y2]` 缺口左上 / 右下坐标（展示坐标系，见上）
 - `confidence`: 0-1 置信度
+- `naturalWidth` / `naturalHeight`: 输入图片的原始像素尺寸（用于反向换算）
+
+```js
+// 图片原始 278×155，页面渲染为 556×310（2 倍）：
+const { box } = await rec.detect(bitmap, { displayWidth: 556, displayHeight: 310 });
+// box 坐标已映射到展示区域，可直接用于模拟拖拽距离
+
+// 不传 opts → box 为原图像素坐标（向后兼容）
+```
 
 ### `recognizer.dispose()`
 
@@ -81,6 +93,10 @@ const rec = await createRecognizer({
 识别逻辑与模型源自 [captcha-recognizer](https://github.com/chenwei-zhao/captcha-recognizer)（MIT，© 2024 Zhao Chenwei）。
 
 原始 fp32 模型（38.7MB）经 int8 QDQ 量化后降至 15.2MB（坐标误差 < 0.3px，置信度误差 < 0.002）。
+
+## 发布
+
+版本发布为全自动流程：合并到 `main` 后执行 `npm version patch|minor|major && git push --follow-tags`，GitHub Actions 自动构建、发布到 npm（Trusted Publisher / OIDC）并创建 Release。详见 [RELEASING.md](./RELEASING.md)。
 
 ## 兼容性
 
