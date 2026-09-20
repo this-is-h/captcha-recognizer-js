@@ -1,6 +1,6 @@
 {
   "name": "captcha-recognizer-js",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "JavaScript port of captcha-recognizer: pure browser-side slider captcha gap detection via ONNX Runtime Web. No server required.",
   "main": "dist/captcha-recognizer-js.cjs",
   "module": "dist/captcha-recognizer-js.esm.js",
