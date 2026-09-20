@@ -58,10 +58,15 @@ export async function createRecognizer({ modelUrl = MODEL_URL } = {}) {
   /**
    * @param {ImageBitmap|HTMLCanvasElement|OffscreenCanvas|Blob|
    *         {data:Uint8ClampedArray,width:number,height:number}} source
+   * @param {{displayWidth?: number, displayHeight?: number}} [opts]
+   *   Optional display area size. When the captcha image is rendered at a
+   *   different size than its natural resolution (e.g. CSS scaling), pass the
+   *   rendered size and the returned box is mapped into display coordinates.
+   *   Defaults to the source's natural size (no remapping).
    * @returns {Promise<{box:number[], confidence:number}>}
-   *   box = [x1,y1,x2,y2] in source pixel coordinates.
+   *   box = [x1,y1,x2,y2] in display coordinates.
    */
-  async function detect(source) {
+  async function detect(source, { displayWidth, displayHeight } = {}) {
     if (source instanceof Blob) {
       source = await createImageBitmap(source);
     }
@@ -70,17 +75,36 @@ export async function createRecognizer({ modelUrl = MODEL_URL } = {}) {
         type: 'identifyData',
         width: source.width, height: source.height, data: source.data,
       });
-      return { box: r.box, confidence: r.confidence };
+      return mapToDisplay(r, source.width, source.height, displayWidth, displayHeight);
     }
-    // Any drawable (HTMLCanvasElement / OffscreenCanvas / image element) is
-    // normalized to an ImageBitmap first: postMessage cannot transfer an
-    // OffscreenCanvas that has a rendering context attached (InvalidStateError),
-    // and ImageBitmap is always transferable.
+    // Normalize any drawable (HTMLCanvasElement / OffscreenCanvas / image
+    // element) to an ImageBitmap: postMessage cannot transfer an
+    // OffscreenCanvas with a rendering context attached (InvalidStateError).
+    // Capture the natural size BEFORE transfer — a transferred ImageBitmap is
+    // detached and its width/height read as 0 afterwards.
     if (!(source instanceof ImageBitmap)) {
       source = await createImageBitmap(source);
     }
+    const natW = source.width, natH = source.height;
     const r = await send({ type: 'identify', bitmap: source }, [source]);
-    return { box: r.box, confidence: r.confidence };
+    return mapToDisplay(r, natW, natH, displayWidth, displayHeight);
+  }
+
+  /** Map a model-space box (original image pixels) into display coordinates. */
+  function mapToDisplay(res, naturalW, naturalH, displayWidth, displayHeight) {
+    const dw = displayWidth ?? naturalW;
+    const dh = displayHeight ?? naturalH;
+    return {
+      box: [
+        res.box[0] * (dw / naturalW),
+        res.box[1] * (dh / naturalH),
+        res.box[2] * (dw / naturalW),
+        res.box[3] * (dh / naturalH),
+      ],
+      confidence: res.confidence,
+      naturalWidth: naturalW,
+      naturalHeight: naturalH,
+    };
   }
 
   function dispose() { worker.terminate(); URL.revokeObjectURL(workerUrl); }
