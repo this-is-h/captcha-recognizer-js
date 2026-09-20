@@ -72,11 +72,12 @@ export async function createRecognizer({ modelUrl = MODEL_URL } = {}) {
       });
       return { box: r.box, confidence: r.confidence };
     }
-    if (!(source instanceof ImageBitmap) &&
-        !(typeof OffscreenCanvas !== 'undefined' && source instanceof OffscreenCanvas)) {
-      const oc = new OffscreenCanvas(source.width, source.height);
-      oc.getContext('2d').drawImage(source, 0, 0);
-      source = oc;
+    // Any drawable (HTMLCanvasElement / OffscreenCanvas / image element) is
+    // normalized to an ImageBitmap first: postMessage cannot transfer an
+    // OffscreenCanvas that has a rendering context attached (InvalidStateError),
+    // and ImageBitmap is always transferable.
+    if (!(source instanceof ImageBitmap)) {
+      source = await createImageBitmap(source);
     }
     const r = await send({ type: 'identify', bitmap: source }, [source]);
     return { box: r.box, confidence: r.confidence };
