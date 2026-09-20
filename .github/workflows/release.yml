@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # create GitHub Release
+      id-token: write # npm trusted publishing (OIDC, no token secret needed)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,10 +57,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          npm version "${{ github.event.inputs.version_bump || 'patch' }}" --no-git-tag-version
+          npm version "${{ inputs.bump || 'patch' }}" --no-git-tag-version
           NEW_VER=$(node -p "require('./package.json').version")
           git commit -am "chore(release): v$NEW_VER" || true
           git tag "v$NEW_VER"
+          git push origin "v$NEW_VER"
 
       # Tag-triggered runs: package.json version is already tagged; keep in sync.
       - name: Sync package.json version with tag (tag runs)
@@ -74,10 +76,12 @@ jobs:
             git commit -am "chore(release): v$TAG_VER [skip ci]" || true
           fi
 
-      - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # npm >= 11.5.1 + provenance flag uses GitHub OIDC — no NPM_TOKEN needed
+      # (configure the connection once on npmjs.com: package → Settings →
+      #  Trusted Publisher → repository this-is-h/captcha-recognizer-js,
+      #  workflow file .github/workflows/release.yml).
+      - name: Publish to npm (trusted publisher)
+        run: npm publish --access public --provenance
 
       - name: Create GitHub Release
         if: github.event_name == 'push'
