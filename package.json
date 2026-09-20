@@ -1,0 +1,43 @@
+{
+  "name": "captcha-recognizer-js",
+  "version": "1.0.0",
+  "description": "JavaScript port of captcha-recognizer: pure browser-side slider captcha gap detection via ONNX Runtime Web. No server required.",
+  "main": "dist/captcha-recognizer-js.cjs",
+  "module": "dist/captcha-recognizer-js.esm.js",
+  "browser": "dist/captcha-recognizer-js.iife.js",
+  "unpkg": "dist/captcha-recognizer-js.iife.js",
+  "jsdelivr": "dist/captcha-recognizer-js.iife.js",
+  "files": [
+    "dist/",
+    "model/",
+    "src/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "prepublishOnly": "node build.js"
+  },
+  "keywords": [
+    "captcha",
+    "slider-captcha",
+    "gap-detection",
+    "onnx",
+    "onnxruntime-web",
+    "browser",
+    "yolo"
+  ],
+  "author": "this-is-h",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/this-is-h/captcha-recognizer-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/this-is-h/captcha-recognizer-js/issues"
+  },
+  "homepage": "https://github.com/this-is-h/captcha-recognizer-js#readme",
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}
